@@ -229,7 +229,44 @@ python -m pytest tests/ -v
 
 ---
 
-## Execution Timeline
+## Target Benchmark Scores
+
+### Official YOLOv5 COCO Benchmarks (Image Size: 640x640)
+
+Based on the official YOLOv5 repository benchmarks, the following are the target performance metrics for each model variant:
+
+| Model | Parameters | FLOPs | mAP@0.5:0.95 | mAP@0.5 | Inference Speed (V100) |
+|-------|------------|-------|--------------|---------|------------------------|
+| YOLOv5n | 1.9M | 4.5G | **28.4%** | 47.9% | 83 ms |
+| YOLOv5s | 7.2M | 16.5G | **37.4%** | 52.9% | 99 ms |
+| YOLOv5m | 21.2M | 49.0G | **45.4%** | 61.6% | 159 ms |
+| YOLOv5l | 46.5M | 109.1G | **49.0%** | 65.5% | 232 ms |
+| YOLOv5x | 86.7M | 205.7G | **50.7%** | 67.0% | 302 ms |
+
+### Target Scores for Custom Dataset Training
+
+When training on a custom dataset, the agent should aim to achieve:
+
+| Metric | Target (Small Dataset <1K images) | Target (Medium Dataset 1K-10K images) | Target (Large Dataset >10K images) |
+|--------|----------------------------------|--------------------------------------|-----------------------------------|
+| mAP@0.5 | ≥ 70% | ≥ 80% | ≥ 85% |
+| mAP@0.5:0.95 | ≥ 50% | ≥ 60% | ≥ 65% |
+| Precision | ≥ 0.70 | ≥ 0.80 | ≥ 0.85 |
+| Recall | ≥ 0.65 | ≥ 0.75 | ≥ 0.80 |
+| F1-Score | ≥ 0.67 | ≥ 0.77 | ≥ 0.82 |
+
+### Performance Validation Criteria
+
+The trained model is considered successful if it meets:
+- **mAP@0.5:0.95** ≥ 60% (for datasets with >1000 images)
+- **Inference Speed** ≥ 30 FPS on NVIDIA GPU
+- **Model Size** < 50MB for YOLOv5s variant
+
+### Notes
+- Benchmarks are based on COCO val2017 dataset
+- Actual performance depends on dataset quality, class balance, and object complexity
+- Training for 100-300 epochs is recommended for optimal results
+- Use YOLOv5s as the default model for best speed/accuracy tradeoff
 
 | Phase | Tasks | Estimated Time |
 |-------|-------|----------------|
