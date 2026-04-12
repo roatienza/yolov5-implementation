@@ -47,7 +47,15 @@ yolov5-implementation/
 
 ## Phase 2: Data Preprocessing Pipeline (COCO-Focused)
 
-### 2.1 COCO Dataset Structure
+### 2.1 Data Directory Configuration
+
+**IMPORTANT**: The agent MUST operate in the sandbox environment and use the `/data` directory (or wherever the data folder is mounted in the sandbox) for all data operations.
+
+- **Data Directory**: `/data` (sandbox-mounted data folder)
+- **All downloads and preprocessing**: Must be performed in `/data`
+- **Do NOT use local filesystem**: Always reference `/data` paths
+
+### 2.2 COCO Dataset Structure
 
 The COCO 2017 dataset is split as follows:
 - **Train2017**: 118,287 images with annotations
@@ -56,19 +64,25 @@ The COCO 2017 dataset is split as follows:
 
 **Dataset Size**: ~20.1 GB (images only)
 
+**Storage Location**: `/data/coco/`
+
 ### 2.2 Download Module (`src/preprocessing/download.py`)
 
 ```python
 # Download COCO dataset automatically
-def download_coco_dataset(output_dir):
+# IMPORTANT: Always use /data directory in sandbox environment
+DATA_ROOT = '/data/coco'  # Sandbox-mounted data directory
+
+def download_coco_dataset(output_dir=DATA_ROOT):
     """
     Downloads COCO 2017 dataset with standard splits.
+    ALWAYS operates in sandbox /data directory.
     
     Args:
-        output_dir: Root directory for dataset storage
+        output_dir: Root directory for dataset storage (default: /data/coco)
     
-    Structure created:
-        output_dir/
+    Structure created in /data/coco/:
+        /data/coco/
         ├── images/
         │   ├── train2017/
         │   ├── val2017/
@@ -78,6 +92,9 @@ def download_coco_dataset(output_dir):
             ├── instances_val2017.json
             └── image_info_test-dev2017.json
     """
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    
     urls = [
         'http://images.cocodataset.org/zips/train2017.zip',   # 19G, 118k images
         'http://images.cocodataset.org/zips/val2017.zip',     # 1G, 5k images
@@ -93,17 +110,20 @@ def download_coco_dataset(output_dir):
 
 ```python
 # Convert COCO JSON annotations to YOLO format
+# IMPORTANT: All paths should reference /data directory in sandbox
+
 def convert_coco_to_yolo(coco_json_path, output_labels_dir, images_dir):
     """
     Converts COCO JSON annotations to YOLO txt format.
+    Operates on data stored in /data/coco/
     
     COCO format: [x_min, y_min, width, height] in pixels
     YOLO format: [x_center, y_center, width, height] normalized to [0, 1]
     
     Args:
-        coco_json_path: Path to COCO annotation JSON file
-        output_labels_dir: Output directory for YOLO label files
-        images_dir: Directory containing COCO images
+        coco_json_path: Path to COCO annotation JSON file (e.g., /data/coco/annotations/instances_train2017.json)
+        output_labels_dir: Output directory for YOLO label files (e.g., /data/coco/labels/train2017/)
+        images_dir: Directory containing COCO images (e.g., /data/coco/images/train2017/)
     
     Returns:
         class_mapping: Dictionary mapping COCO category IDs to YOLO class indices
@@ -199,11 +219,12 @@ def visualize_coco_dataset(images_dir, labels_dir, output_dir):
 
 ### 2.8 Dataset YAML Configuration
 
-After preprocessing, create `data/coco.yaml`:
+After preprocessing, create `data/coco.yaml` with paths pointing to `/data/coco/`:
 
 ```yaml
 # COCO 2017 dataset configuration for YOLOv5
-path: ../datasets/coco  # dataset root directory
+# IMPORTANT: All paths reference /data directory in sandbox
+path: /data/coco  # dataset root directory (sandbox-mounted)
 train: images/train2017  # train images (relative to 'path')
 val: images/val2017      # val images
 test: images/test2017    # test images (optional)
@@ -336,15 +357,15 @@ with open('data/coco.yaml', 'w') as f:
 
 ### 2.10 Deliverables
 
-- ✅ COCO dataset downloaded and organized
+- ✅ COCO dataset downloaded and organized in `/data/coco/`
 - ✅ Annotations converted from COCO JSON to YOLO txt format
-- ✅ `data/coco.yaml` configuration file
-- ✅ Validation report (`data/validation_report.json`)
-- ✅ Visualization plots (`data/visualizations/`)
-- ✅ Ready-to-train dataset structure:
+- ✅ `data/coco.yaml` configuration file (with /data paths)
+- ✅ Validation report (`/data/validation_report.json`)
+- ✅ Visualization plots (`/data/visualizations/`)
+- ✅ Ready-to-train dataset structure in sandbox:
 
 ```
-data/coco/
+/data/coco/
 ├── images/
 │   ├── train2017/  (118,287 images)
 │   ├── val2017/    (5,000 images)
@@ -354,6 +375,8 @@ data/coco/
 │   └── val2017/    (5,000 .txt files)
 └── coco.yaml       (dataset configuration)
 ```
+
+**IMPORTANT**: All data operations MUST occur in the `/data` directory (sandbox-mounted). Do NOT store data in the local filesystem.
 
 ---
 
