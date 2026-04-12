@@ -1031,41 +1031,154 @@ echo "IMPORTANT: Must execute in sandbox with /data directory mounted"
 
 ## Phase 5: Model Export & Inference
 
-### 5.1 Export Module (`src/inference/export.py`)
-- Export to ONNX format
-- Export to TorchScript
-- Validate exported model
+### 5.1 Model Checkpoint Management
 
-### 5.2 Detection Module (`src/inference/detect.py`)
-- Batch image inference
-- Video inference
-- Save detection results
+**IMPORTANT**: The agent MUST operate in the sandbox environment and use the `/data` directory for all model storage.
 
-### 5.3 Export Execution (`scripts/export.sh`)
-```bash
-python src/inference/export.py \
-  --weights runs/detect/train/weights/best.pt \
-  --format onnx \
-  --img-size 640
+- **Model Storage Location**: `/data/runs/train/weights/`
+- **Checkpoint Format**: Plain PyTorch `.pt` files (no ONNX or TorchScript conversion needed)
+- **Do NOT use local filesystem**: Always reference `/data` paths
+
+### 5.2 Model Checkpoint Types
+
+YOLOv5 automatically saves the following checkpoints during training:
+
+| Checkpoint | Location | Description |
+|------------|----------|-------------|
+| `best.pt` | `/data/runs/train/weights/best.pt` | Best model based on mAP@0.5:0.95 |
+| `last.pt` | `/data/runs/train/weights/last.pt` | Last epoch checkpoint |
+| `final.pt` | `/data/runs/train/weights/final.pt` | Final training checkpoint |
+
+### 5.3 Export Module (`src/inference/export.py`)
+
+```python
+# Model checkpoint management - NO ONNX/TorchScript conversion needed
+# IMPORTANT: All paths should reference /data directory in sandbox
+
+def verify_model_checkpoint(checkpoint_path='/data/runs/train/weights/best.pt'):
+    """
+    Verifies the trained model checkpoint is valid and loadable.
+    Operates on data stored in /data/runs/
+    
+    Args:
+        checkpoint_path: Path to the trained model checkpoint (default: /data/runs/train/weights/best.pt)
+    
+    Returns:
+        verification_report: Dictionary with checkpoint validation results
+    """
+    import torch
+    
+    # Load the model checkpoint
+    model = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Verify model structure
+    assert 'model' in model, "Checkpoint missing model weights"
+    assert 'epoch' in model, "Checkpoint missing epoch information"
+    
+    # Verify model can perform forward pass
+    model['model'].eval()
+    with torch.no_grad():
+        dummy_input = torch.randn(1, 3, 640, 640)
+        output = model['model'](dummy_input)
+    
+    print(f"✓ Model checkpoint verified successfully: {checkpoint_path}")
+    print(f"  - Epoch: {model['epoch']}")
+    print(f"  - mAP@0.5:0.95: {model.get('metrics', {}).get('map50_95', 'N/A')}")
+    
+    return {
+        'status': 'valid',
+        'checkpoint_path': checkpoint_path,
+        'epoch': model['epoch'],
+        'map50_95': model.get('metrics', {}).get('map50_95', 'N/A')
+    }
 ```
 
-### 5.4 Deliverables
-- ONNX model (`model.onnx`)
-- TorchScript model (`model.pt`)
-- Inference script
+### 5.4 Detection Module (`src/inference/detect.py`)
 
-### 5.5 Phase 5 Completion Targets ✅
+```python
+# Inference with plain PyTorch checkpoint - NO export conversion needed
+# IMPORTANT: All paths should reference /data directory in sandbox
+
+def run_inference(checkpoint_path='/data/runs/train/weights/best.pt', 
+                  image_path=None, batch_images=None):
+    """
+    Runs inference using the trained YOLOv5 model checkpoint.
+    Operates on data stored in /data/runs/
+    
+    Args:
+        checkpoint_path: Path to the trained model checkpoint (default: /data/runs/train/weights/best.pt)
+        image_path: Single image path for inference
+        batch_images: List of image paths for batch inference
+    
+    Returns:
+        detections: List of detection results with bounding boxes and confidence scores
+    """
+    import torch
+    from ultralytics.yolo.engine.model import YOLO
+    
+    # Load the trained model directly from checkpoint
+    model = YOLO(checkpoint_path)
+    
+    # Run inference
+    if image_path:
+        results = model.predict(source=image_path, imgsz=640, conf=0.25)
+    elif batch_images:
+        results = model.predict(source=batch_images, imgsz=640, conf=0.25)
+    
+    return results
+```
+
+### 5.5 Inference Execution (`scripts/inference.sh`)
+
+```bash
+#!/bin/bash
+# Run inference with trained YOLOv5 model
+# IMPORTANT: All paths reference /data directory in sandbox
+
+CHECKPOINT="/data/runs/train/weights/best.pt"
+TEST_IMAGES="/data/coco/images/val2017"
+OUTPUT_DIR="/data/runs/inference/results"
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
+
+# Run inference on validation set (sample of 100 images)
+python src/inference/detect.py \
+  --weights "$CHECKPOINT" \
+  --source "$TEST_IMAGES" \
+  --batch-size 16 \
+  --img-size 640 \
+  --conf-thres 0.25 \
+  --iou-thres 0.45 \
+  --save-txt \
+  --save-conf \
+  --project "$OUTPUT_DIR"
+
+echo "Inference completed. Results saved to: $OUTPUT_DIR"
+```
+
+### 5.6 Deliverables
+
+| File | Location | Description |
+|------|----------|-------------|
+| `best.pt` | `/data/runs/train/weights/best.pt` | Best trained model checkpoint |
+| `last.pt` | `/data/runs/train/weights/last.pt` | Last epoch checkpoint |
+| `final.pt` | `/data/runs/train/weights/final.pt` | Final training checkpoint |
+| Inference results | `/data/runs/inference/results/` | Detection outputs (images, txt files) |
+| Verification report | `/data/runs/inference/verification_report.json` | Model checkpoint validation |
+
+### 5.7 Phase 5 Completion Targets ✅
 
 **Before moving to Phase 6, these targets must be achieved:**
 
 | Target | Verification Method | Status |
 |--------|-------------------|--------|
-| ONNX model exported successfully | File exists: `/data/runs/export/model.onnx` | ⬜ |
-| TorchScript model exported successfully | File exists: `/data/runs/export/model.pt` | ⬜ |
-| Exported model validated (forward pass works) | No errors in validation | ⬜ |
-| Inference script tested with sample images | Detection results generated | ⬜ |
+| Model checkpoint `best.pt` exists | File exists: `/data/runs/train/weights/best.pt` | ⬜ |
+| Model checkpoint verified (forward pass works) | No errors in verification script | ⬜ |
+| Inference script tested with sample images | Detection results in `/data/runs/inference/results/` | ⬜ |
 | Inference speed ≥ 30 FPS on GPU | Benchmark test results | ⬜ |
-| All export/inference code committed to repo | Git log verification | ⬜ |
+| Verification report generated | File exists: `/data/runs/inference/verification_report.json` | ⬜ |
+| All inference code committed to repo | Git log verification | ⬜ |
 
 **Success Criteria:** All 6 targets marked as ✅ completed
 
