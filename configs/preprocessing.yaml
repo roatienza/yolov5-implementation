@@ -1,0 +1,29 @@
+# Preprocessing configuration
+
+dataset:
+  name: "coco2017"
+  root_dir: "/data/memory/coco"
+  
+  # Image directories
+  train_images: "images/train2017"
+  val_images: "images/val2017"
+  test_images: "images/test2017"
+  
+  # Label directories
+  train_labels: "labels/train2017"
+  val_labels: "labels/val2017"
+  
+  # Annotation files
+  train_annotations: "annotations/instances_train2017.json"
+  val_annotations: "annotations/instances_val2017.json"
+  
+  # Dataset parameters
+  num_classes: 80
+  image_size: 640
+  
+  # Augmentation settings
+  augment:
+    enabled: true
+    horizontal_flip: 0.5
+    mosaic: 1.0
+    mixup: 0.1
