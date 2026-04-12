@@ -689,41 +689,279 @@ metrics = {
 
 ---
 
-## Phase 4: Model Evaluation
+## Phase 4: Model Evaluation (Detailed)
+
+**IMPORTANT**: All evaluation operations MUST occur in the sandbox environment using the `/data` directory.
 
 ### 4.1 Metrics Module (`src/evaluation/metrics.py`)
-- Calculate mAP@0.5
-- Calculate mAP@0.5:0.95
-- Compute Precision, Recall, F1-score
-- Per-class metrics
-- Inference speed (FPS)
-- Model size (parameters, FLOPs)
 
-### 4.2 Evaluation Script (`src/evaluation/evaluate.py`)
-- Load trained model
-- Run inference on test set
-- Compute all metrics
-- Generate confusion matrix
-- Export evaluation report
+```python
+# Calculate comprehensive evaluation metrics
+# IMPORTANT: All paths should reference /data directory in sandbox
 
-### 4.3 Visualization (`src/evaluation/visualize_results.py`)
-- Generate detection result images
-- Create confusion matrix heatmap
-- Plot precision-recall curves
-- Save plots to `results/`
-
-### 4.4 Evaluation Execution (`scripts/evaluate.sh`)
-```bash
-python src/evaluation/evaluate.py \
-  --weights runs/detect/train/weights/best.pt \
-  --data data/dataset.yaml \
-  --split test
+def calculate_metrics(predictions, targets, iou_thresholds=None):
+    """
+    Calculate all evaluation metrics for object detection.
+    
+    Metrics computed:
+    - mAP@0.5: Mean Average Precision at IoU=0.5
+    - mAP@0.5:0.95: Mean Average Precision across IoU thresholds 0.5 to 0.95
+    - Precision: TP / (TP + FP)
+    - Recall: TP / (TP + FN)
+    - F1-Score: 2 * (Precision * Recall) / (Precision + Recall)
+    - Per-class mAP, Precision, Recall
+    - False Positive Rate, False Negative Rate
+    
+    Args:
+        predictions: List of detected boxes [x1, y1, x2, y2, confidence, class]
+        targets: List of ground truth boxes [x1, y1, x2, y2, class]
+        iou_thresholds: List of IoU thresholds (default: [0.5, 0.55, ..., 0.95])
+    
+    Returns:
+        metrics_dict: Dictionary with all computed metrics
+    """
+    
+def calculate_inference_speed(model, img_size=640, num_iterations=100):
+    """
+    Measure inference speed in FPS (Frames Per Second).
+    
+    Args:
+        model: Trained YOLOv5 model
+        img_size: Image size for inference (default: 640)
+        num_iterations: Number of iterations for averaging (default: 100)
+    
+    Returns:
+        fps: Average frames per second
+        latency_ms: Average latency in milliseconds
+    """
+    
+def calculate_model_size(model_path):
+    """
+    Calculate model size metrics.
+    
+    Returns:
+        - Parameters: Total number of parameters
+        - FLOPs: Floating point operations
+        - Model size in MB
+    """
 ```
 
-### 4.5 Deliverables
-- Evaluation report (`results/evaluation_report.md`)
-- Metrics CSV (`results/metrics.csv`)
-- Visualization plots (`results/plots/`)
+### 4.2 Evaluation Script (`src/evaluation/evaluate.py`)
+
+```python
+# Comprehensive evaluation pipeline
+# IMPORTANT: Operates in sandbox /data directory
+
+def evaluate_model(weights_path, data_yaml_path, split='val'):
+    """
+    Full evaluation pipeline for trained YOLOv5 model.
+    
+    Args:
+        weights_path: Path to trained model weights (e.g., /data/runs/train/weights/best.pt)
+        data_yaml_path: Path to dataset configuration (e.g., /data/coco.yaml)
+        split: Dataset split to evaluate (train, val, or test)
+    
+    Process:
+    1. Load trained model from weights_path
+    2. Load dataset from data_yaml_path
+    3. Run inference on all images in specified split
+    4. Compute metrics using calculate_metrics()
+    5. Generate confusion matrix
+    6. Create precision-recall curves per class
+    7. Export evaluation report
+    
+    Returns:
+        evaluation_results: Dictionary with all metrics and results
+    """
+    
+    # Save results to /data/runs/evaluate/
+    results_dir = '/data/runs/evaluate/'
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Export:
+    # - evaluation_report.md: Full evaluation summary
+    # - metrics.csv: All metrics in CSV format
+    # - confusion_matrix.png: Visual confusion matrix
+    # - pr_curves.png: Precision-recall curves
+```
+
+### 4.3 Error Analysis (`src/evaluation/error_analysis.py`)
+
+```python
+# Analyze model errors and identify improvement areas
+
+def analyze_errors(predictions, targets, images_dir, output_dir='/data/runs/evaluate/error_analysis/'):
+    """
+    Perform detailed error analysis on model predictions.
+    
+    Analysis includes:
+    - Identify misclassified samples (save images)
+    - Analyze false positives (visualize with bounding boxes)
+    - Analyze false negatives (show missed detections)
+    - Detect difficult cases:
+      * Occluded objects
+      * Small objects (<32x32 pixels)
+      * Low confidence predictions
+      * Edge cases
+    - Class-specific performance breakdown
+    - IoU threshold sensitivity analysis
+    
+    Args:
+        predictions: Model predictions
+        targets: Ground truth annotations
+        images_dir: Directory with test images (e.g., /data/coco/images/val2017/)
+        output_dir: Output directory for error analysis (default: /data/runs/evaluate/error_analysis/)
+    
+    Returns:
+        error_report: Dictionary with error statistics and sample images
+    """
+```
+
+### 4.4 Visualization Jupyter Notebook (`notebooks/evaluation_visualization.ipynb`)
+
+**IMPORTANT**: This notebook MUST be executed in the sandbox environment.
+
+```python
+# evaluation_visualization.ipynb
+# Interactive visualization of model performance on random test images
+# IMPORTANT: All paths must reference /data directory in sandbox
+
+import torch
+import random
+import cv2
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+# Configuration - MUST use sandbox /data directory
+DATA_DIR = '/data/coco'
+WEIGHTS_PATH = '/data/runs/train/weights/best.pt'
+TEST_IMAGES_DIR = f'{DATA_DIR}/images/val2017'  # Use val2017 for evaluation
+OUTPUT_DIR = '/data/runs/evaluate/visualization'
+
+# Load model
+model = torch.load(WEIGHTS_PATH, map_location='cpu')
+model.eval()
+
+# Get random test images
+image_files = list(Path(TEST_IMAGES_DIR).glob('*.jpg'))
+random.seed(42)
+sample_images = random.sample(image_files, min(10, len(image_files)))
+
+# Run inference and visualize
+for img_path in sample_images:
+    # Load image
+    img = cv2.imread(str(img_path))
+    
+    # Run inference
+    results = model(img, size=640)
+    
+    # Visualize detections
+    plt.figure(figsize=(15, 10))
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    
+    # Plot bounding boxes
+    for pred in results[0].boxes:
+        x1, y1, x2, y2 = pred.xyxy[0].cpu().numpy()
+        conf = pred.conf[0].cpu().numpy()
+        cls = pred.cls[0].cpu().numpy()
+        
+        # Draw bounding box
+        rect = plt.Rectangle((x1, y1), x2-x1, y2-y1, 
+                            fill=False, edgecolor='green', linewidth=2)
+        plt.gca().add_patch(rect)
+        
+        # Add label
+        label = f'Class {int(cls)}: {conf:.2f}'
+        plt.text(x1, y1-10, label, color='green', fontsize=12, 
+                bbox=dict(facecolor='white', alpha=0.8))
+    
+    plt.title(f'Detections: {img_path.name}')
+    plt.axis('off')
+    plt.tight_layout()
+    
+    # Save visualization
+    output_path = Path(OUTPUT_DIR) / f'{img_path.stem}_detections.png'
+    plt.savefig(str(output_path), dpi=150, bbox_inches='tight')
+    plt.show()
+
+# Summary statistics
+print(f"Visualized {len(sample_images)} random test images")
+print(f"Results saved to: {OUTPUT_DIR}")
+```
+
+### 4.5 Evaluation Execution (`scripts/evaluate.sh`)
+
+```bash
+#!/bin/bash
+# Evaluate trained YOLOv5 model
+# IMPORTANT: All operations in sandbox /data directory
+
+# Set paths (sandbox-mounted)
+WEIGHTS="/data/runs/train/weights/best.pt"
+DATA_YAML="/data/coco.yaml"
+OUTPUT_DIR="/data/runs/evaluate"
+
+# Create output directory
+mkdir -p $OUTPUT_DIR
+
+# Run evaluation
+python src/evaluation/evaluate.py \
+  --weights $WEIGHTS \
+  --data $DATA_YAML \
+  --split val \
+  --output $OUTPUT_DIR
+
+# Run error analysis
+python src/evaluation/error_analysis.py \
+  --weights $WEIGHTS \
+  --data $DATA_YAML \
+  --split val \
+  --output $OUTPUT_DIR/error_analysis
+
+# Generate visualization (run Jupyter notebook in sandbox)
+# Note: Execute notebook in sandbox environment
+echo "To visualize results, run: jupyter notebook notebooks/evaluation_visualization.ipynb"
+echo "IMPORTANT: Must execute in sandbox with /data directory mounted"
+```
+
+### 4.6 Evaluation Deliverables
+
+- ✅ **Evaluation Report** (`/data/runs/evaluate/evaluation_report.md`)
+  - Overall mAP@0.5 and mAP@0.5:0.95
+  - Precision, Recall, F1-score
+  - Per-class metrics table
+  - Confusion matrix
+  - Inference speed (FPS)
+  - Model size metrics
+
+- ✅ **Metrics CSV** (`/data/runs/evaluate/metrics.csv`)
+  - All metrics in machine-readable format
+  - Per-class breakdown
+  - Epoch-wise comparison (if multiple checkpoints)
+
+- ✅ **Visualization Plots** (`/data/runs/evaluate/plots/`)
+  - Confusion matrix heatmap
+  - Precision-recall curves (per class and overall)
+  - ROC curves (optional)
+  - Loss curves from training
+
+- ✅ **Error Analysis** (`/data/runs/evaluate/error_analysis/`)
+  - False positive samples (images with bounding boxes)
+  - False negative samples (missed detections)
+  - Difficult cases (occluded, small objects)
+  - Class-specific error breakdown
+
+- ✅ **Jupyter Notebook** (`notebooks/evaluation_visualization.ipynb`)
+  - Interactive visualization of random test images
+  - Bounding box overlay with confidence scores
+  - Class distribution visualization
+  - **IMPORTANT**: Must be executed in sandbox environment
+
+- ✅ **Sample Detection Images** (`/data/runs/evaluate/visualization/`)
+  - 10 random test images with detection results
+  - High-resolution PNG files (150 DPI)
+
+**IMPORTANT**: All evaluation outputs are saved to `/data/runs/evaluate/` in the sandbox. The Jupyter notebook must be executed in the sandbox environment with `/data` directory mounted.
 
 ---
 
