@@ -2,6 +2,22 @@
 
 ## Phase 1: Repository Setup
 
+### 1.0 GPU Environment Verification
+
+**CRITICAL**: All operations MUST use GPU acceleration. Before starting any phase, verify GPU availability:
+
+```bash
+# Verify GPU is available in sandbox
+nvidia-smi
+# OR
+python -c "import torch; print(f'GPU Available: {torch.cuda.is_available()}'); print(f'Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"}')"
+```
+
+**Requirements:**
+- GPU MUST be available and accessible
+- All training and inference operations MUST run on GPU
+- If GPU is not available, the agent MUST report an error and stop
+
 ### 1.1 Repository Structure
 ```
 yolov5-implementation/
@@ -49,6 +65,7 @@ yolov5-implementation/
 
 | Target | Verification Method | Status |
 |--------|-------------------|--------|
+| GPU verified and accessible | `nvidia-smi` shows GPU available | ⬜ |
 | Repository created at `roatienza/yolov5-implementation` | GitHub API check | ⬜ |
 | All directories in structure exist | `ls -R` command | ⬜ |
 | `requirements.txt` contains all dependencies | File content check | ⬜ |
@@ -56,7 +73,7 @@ yolov5-implementation/
 | Initial commit pushed to `main` branch | Git log verification | ⬜ |
 | Repository is private | GitHub settings check | ⬜ |
 
-**Success Criteria:** All 6 targets marked as ✅ completed
+**Success Criteria:** All 7 targets marked as ✅ completed
 
 ---
 
@@ -413,12 +430,42 @@ with open('data/coco.yaml', 'w') as f:
 
 ## Phase 3: Model Creation and Training
 
-**IMPORTANT**: All operations MUST be performed in the sandbox environment. The sandbox has the following packages pre-installed:
+**CRITICAL**: All training operations MUST use GPU acceleration. The sandbox environment has GPU support enabled.
 
-### 3.0 Existing Sandbox Packages (No Installation Needed)
+### 3.0 GPU Verification (Required Before Training)
+
+**Before starting training, verify GPU availability:**
+
+```python
+# src/training/config.py
+import torch
+
+def verify_gpu_available():
+    """Verify GPU is available before training - MUST fail if no GPU"""
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU is not available! Training requires GPU acceleration.")
+    
+    print(f"✓ GPU Available: {torch.cuda.get_device_name(0)}")
+    print(f"✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    print(f"✓ CUDA Version: {torch.version.cuda}")
+    return True
+
+# Call this before any training operation
+verify_gpu_available()
+```
+
+**GPU Configuration:**
+```python
+# Always use GPU device
+DEVICE = 'cuda:0'  # First GPU
+FORCE_GPU = True  # Force GPU usage
+```
+
+### 3.1 Existing Sandbox Packages (No Installation Needed)
+
 | Package | Version | Status |
 |---------|---------|--------|
-| torch | 2.11.0 | ✅ Already installed |
+| torch | 2.11.0 | ✅ Already installed (with CUDA) |
 | opencv-python | 4.13.0.92 | ✅ Already installed |
 | Pillow | 12.2.0 | ✅ Already installed |
 | numpy | 2.4.4 | ✅ Already installed |
@@ -426,7 +473,8 @@ with open('data/coco.yaml', 'w') as f:
 | matplotlib | 3.10.8 | ✅ Already installed |
 | tqdm | 4.67.3 | ✅ Already installed |
 
-### 3.1 Packages to Install (If Not Present)
+### 3.2 Packages to Install (If Not Present)
+
 ```bash
 # Only install if missing in sandbox
 pip install ultralytics>=8.0.0  # YOLOv5/v8 library
@@ -435,7 +483,7 @@ pip install albumentations>=1.0.3  # Advanced augmentations
 pip install pyyaml>=6.0  # YAML configuration
 ```
 
-### 3.2 YOLOv5 Model Architecture Overview
+### 3.3 YOLOv5 Model Architecture Overview
 
 YOLOv5 models are available in 5 sizes, all using the same architecture with different depths and widths:
 
@@ -528,6 +576,7 @@ def export_model_structure(model, output_path):
 ```yaml
 # Training configuration for YOLOv5
 # IMPORTANT: All paths reference /data directory in sandbox
+# CRITICAL: GPU MUST be used for all training operations
 
 # Model settings
 model_size: 's'  # n, s, m, l, x
@@ -537,7 +586,7 @@ pretrained: true  # Use COCO pretrained weights
 epochs: 100
 batch_size: 16
 img_size: 640
-device: 'cuda:0'  # Use GPU in sandbox
+device: 'cuda:0'  # Use GPU in sandbox - REQUIRED
 
 # Data settings (sandbox paths)
 data: '/data/coco.yaml'  # Dataset configuration
@@ -549,6 +598,11 @@ lr0: 0.01  # Initial learning rate
 lrf: 0.1  # Final learning rate (lr0 * lrf)
 momentum: 0.937
 weight_decay: 0.0005
+
+# GPU Settings
+force_gpu: true  # Force GPU usage
+gpu_memory_fraction: 0.9  # Use 90% of GPU memory
+```
 
 # Augmentation
 hyp: 'hyp.scratch-low.yaml'  # Hyperparameters
@@ -569,13 +623,23 @@ exist_ok: true  # Overwrite existing runs
 ```python
 # Train YOLOv5 model
 # IMPORTANT: All operations in sandbox environment
+# CRITICAL: GPU MUST be used for training
 
 from ultralytics import YOLO
+import torch
 import yaml
+
+def verify_gpu_before_training():
+    """Verify GPU is available before training - MUST fail if no GPU"""
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU is not available! Training requires GPU acceleration.")
+    print(f"✓ GPU Available: {torch.cuda.get_device_name(0)}")
+    print(f"✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 
 def train_yolov5(model, data_path, epochs=100, batch_size=16, img_size=640):
     """
     Trains a YOLOv5 model on the specified dataset.
+    ALL TRAINING MUST USE GPU.
     
     Args:
         model: YOLOv5 model instance (from create_yolov5_model)
@@ -591,13 +655,16 @@ def train_yolov5(model, data_path, epochs=100, batch_size=16, img_size=640):
         >>> model = create_yolov5_model(model_size='s')
         >>> results = train_yolov5(model, data_path='/data/coco.yaml', epochs=100)
     """
-    # Train the model
+    # CRITICAL: Verify GPU before training
+    verify_gpu_before_training()
+    
+    # Train the model (GPU is automatically used by ultralytics if available)
     results = model.train(
         data=data_path,
         epochs=epochs,
         batch=batch_size,
         imgsz=img_size,
-        device='0',  # Use GPU
+        device='0',  # Use GPU (device='0' = first GPU)
         workers=8,
         project='/data/runs',  # Sandbox output directory
         name='train',
@@ -724,6 +791,7 @@ metrics = {
 
 | Target | Verification Method | Status |
 |--------|-------------------|--------|
+| GPU verified and training used GPU | Logs show "GPU Available" message | ⬜ |
 | Required packages installed (`ultralytics`, `tensorboard`, `albumentations`, `pyyaml`) | `pip list` verification | ⬜ |
 | YOLOv5 model architecture created and documented | File exists: `docs/model_architecture.txt` | ⬜ |
 | Training completed for 100 epochs | Checkpoint exists: `/data/runs/train/weights/last.pt` | ⬜ |
@@ -731,6 +799,8 @@ metrics = {
 | TensorBoard logs generated | Directory exists: `/data/runs/train/*/results` | ⬜ |
 | Training results.csv contains all epochs | File size > 10KB | ⬜ |
 | All training code committed to repo | Git log verification | ⬜ |
+
+**Success Criteria:** All 8 targets marked as ✅ completed
 
 **Success Criteria:** All 7 targets marked as ✅ completed
 
@@ -1174,9 +1244,9 @@ echo "Inference completed. Results saved to: $OUTPUT_DIR"
 | Target | Verification Method | Status |
 |--------|-------------------|--------|
 | Model checkpoint `best.pt` exists | File exists: `/data/runs/train/weights/best.pt` | ⬜ |
-| Model checkpoint verified (forward pass works) | No errors in verification script | ⬜ |
+| Model checkpoint verified (forward pass works on GPU) | No errors in verification script, GPU used | ⬜ |
 | Inference script tested with sample images | Detection results in `/data/runs/inference/results/` | ⬜ |
-| Inference speed ≥ 30 FPS on GPU | Benchmark test results | ⬜ |
+| Inference speed ≥ 30 FPS on GPU | Benchmark test results (GPU required) | ⬜ |
 | Verification report generated | File exists: `/data/runs/inference/verification_report.json` | ⬜ |
 | All inference code committed to repo | Git log verification | ⬜ |
 
@@ -1227,15 +1297,17 @@ python -m pytest tests/ -v
 
 | Phase | Target Count | Status |
 |-------|-------------|--------|
-| Phase 1: Repository Setup | 6 targets | ⬜ |
+| Phase 1: Repository Setup | 7 targets | ⬜ |
 | Phase 2: Data Preprocessing | 7 targets | ⬜ |
-| Phase 3: Model Training | 7 targets | ⬜ |
+| Phase 3: Model Training | 8 targets | ⬜ |
 | Phase 4: Model Evaluation | 8 targets | ⬜ |
 | Phase 5: Model Export | 6 targets | ⬜ |
 | Phase 6: Documentation & Testing | 7 targets | ⬜ |
-| **TOTAL** | **41 targets** | ⬜ |
+| **TOTAL** | **43 targets** | ⬜ |
 
-**Final Success Criteria:** All 41 targets across all 6 phases marked as ✅ completed
+**Final Success Criteria:** All 43 targets across all 6 phases marked as ✅ completed
+
+**CRITICAL REMINDER:** All operations MUST use GPU acceleration throughout the entire project.
 
 ---
 
