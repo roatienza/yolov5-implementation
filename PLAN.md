@@ -45,48 +45,315 @@ yolov5-implementation/
 
 ---
 
-## Phase 2: Data Preprocessing Pipeline
+## Phase 2: Data Preprocessing Pipeline (COCO-Focused)
 
-### 2.1 Download Module (`src/preprocessing/download.py`)
-- Download dataset from specified URL (Roboflow, Kaggle API, or direct URL)
-- Extract compressed archives (zip, tar.gz)
-- Organize into train/val/test directories
+### 2.1 COCO Dataset Structure
 
-### 2.2 Validation Module (`src/preprocessing/validate.py`)
-- Check for corrupted images (OpenCV read test)
-- Verify label file existence for each image
-- Validate label format (coordinates within 0-1 range)
-- Generate validation report
+The COCO 2017 dataset is split as follows:
+- **Train2017**: 118,287 images with annotations
+- **Val2017**: 5,000 images with annotations
+- **Test2017**: 40,670 images (test-dev: 20,288 images for evaluation)
 
-### 2.3 Augmentation Module (`src/preprocessing/augment.py`)
-- Apply Mosaic augmentation
-- Apply MixUp augmentation
-- Random horizontal flip
-- Random rotation (±15°)
-- Random brightness/contrast adjustments
-- Random scaling (0.5x - 1.5x)
+**Dataset Size**: ~20.1 GB (images only)
 
-### 2.4 Conversion Module (`src/preprocessing/convert.py`)
-- Convert COCO JSON → YOLO txt format
-- Convert Pascal VOC XML → YOLO txt format
-- Normalize coordinates to [0, 1] range
-- Generate class mapping file
+### 2.2 Download Module (`src/preprocessing/download.py`)
 
-### 2.5 Splitting Module (`src/preprocessing/split.py`)
-- Split dataset into train/val/test (80/10/10)
-- Ensure class balance across splits
-- Prevent data leakage
+```python
+# Download COCO dataset automatically
+def download_coco_dataset(output_dir):
+    """
+    Downloads COCO 2017 dataset with standard splits.
+    
+    Args:
+        output_dir: Root directory for dataset storage
+    
+    Structure created:
+        output_dir/
+        ├── images/
+        │   ├── train2017/
+        │   ├── val2017/
+        │   └── test2017/
+        └── annotations/
+            ├── instances_train2017.json
+            ├── instances_val2017.json
+            └── image_info_test-dev2017.json
+    """
+    urls = [
+        'http://images.cocodataset.org/zips/train2017.zip',   # 19G, 118k images
+        'http://images.cocodataset.org/zips/val2017.zip',     # 1G, 5k images
+        'http://images.cocodataset.org/zips/test2017.zip'     # 7G, 41k images
+    ]
+    annotation_urls = [
+        'http://images.cocodataset.org/annotations/annotations_trainval2017.zip',
+        'http://images.cocodataset.org/annotations/image_info_test-dev2017.zip'
+    ]
+```
 
-### 2.6 Visualization Module (`src/preprocessing/visualize.py`)
-- Generate bounding box visualization images
-- Create class distribution histogram
-- Generate image size distribution plot
-- Export quality report as JSON
+### 2.3 COCO to YOLO Conversion Module (`src/preprocessing/convert.py`)
 
-### 2.7 Deliverables
-- Clean dataset in YOLO format
-- `data/dataset.yaml` configuration file
-- `data/quality_report.json`
+```python
+# Convert COCO JSON annotations to YOLO format
+def convert_coco_to_yolo(coco_json_path, output_labels_dir, images_dir):
+    """
+    Converts COCO JSON annotations to YOLO txt format.
+    
+    COCO format: [x_min, y_min, width, height] in pixels
+    YOLO format: [x_center, y_center, width, height] normalized to [0, 1]
+    
+    Args:
+        coco_json_path: Path to COCO annotation JSON file
+        output_labels_dir: Output directory for YOLO label files
+        images_dir: Directory containing COCO images
+    
+    Returns:
+        class_mapping: Dictionary mapping COCO category IDs to YOLO class indices
+    """
+    # COCO has 80 classes with non-contiguous IDs
+    # YOLO requires contiguous IDs from 0 to 79
+    coco_category_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 
+                         18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 
+                         35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 
+                         50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 
+                         64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 
+                         82, 84, 85, 86, 87, 88, 90]
+    
+    # Convert bounding box: COCO [x_min, y_min, w, h] → YOLO [x_center, y_center, w, h]
+    # Normalize to [0, 1] range based on image dimensions
+```
+
+### 2.4 Validation Module (`src/preprocessing/validate.py`)
+
+```python
+# Validate COCO dataset and converted YOLO format
+def validate_coco_dataset(images_dir, labels_dir):
+    """
+    Validates COCO dataset integrity and YOLO conversion.
+    
+    Checks:
+    - All images are readable (no corruption)
+    - Label file exists for each image
+    - Label coordinates are within [0, 1] range
+    - No empty labels (unless image has no objects)
+    - Class IDs are within valid range (0-79)
+    
+    Returns:
+        validation_report: Dictionary with validation results
+    """
+```
+
+### 2.5 Dataset Split Verification (`src/preprocessing/split.py`)
+
+```python
+# Verify COCO standard splits
+def verify_coco_splits():
+    """
+    COCO 2017 uses pre-defined splits (no random splitting needed):
+    
+    - train2017.txt: 118,287 images
+    - val2017.txt: 5,000 images
+    - test-dev2017.txt: 20,288 images (for evaluation submission)
+    
+    This function verifies the splits are correct and creates image list files.
+    """
+```
+
+### 2.6 Augmentation Module (`src/preprocessing/augment.py`)
+
+```python
+# Augmentation applied during training (not preprocessing)
+# YOLOv5 handles augmentation on-the-fly during training
+# This module provides optional offline augmentation for data augmentation strategies
+
+def apply_offline_augmentation(images_dir, labels_dir, output_dir):
+    """
+    Optional: Apply offline augmentation to create additional training samples.
+    
+    Augmentations:
+    - Mosaic (combines 4 images)
+    - MixUp (blends 2 images)
+    - Random horizontal flip
+    - Random rotation (±15°)
+    - Random brightness/contrast/hue adjustments
+    - Random scaling (0.5x - 1.5x)
+    
+    Note: YOLOv5 applies most augmentations on-the-fly during training.
+    """
+```
+
+### 2.7 Visualization Module (`src/preprocessing/visualize.py`)
+
+```python
+# Visualize COCO dataset statistics
+def visualize_coco_dataset(images_dir, labels_dir, output_dir):
+    """
+    Generates visualization reports for COCO dataset:
+    
+    - Class distribution histogram (80 classes)
+    - Bounding box aspect ratio distribution
+    - Object count per image distribution
+    - Image size distribution
+    - Sample annotated images with bounding boxes
+    - Label quality report (JSON)
+    """
+```
+
+### 2.8 Dataset YAML Configuration
+
+After preprocessing, create `data/coco.yaml`:
+
+```yaml
+# COCO 2017 dataset configuration for YOLOv5
+path: ../datasets/coco  # dataset root directory
+train: images/train2017  # train images (relative to 'path')
+val: images/val2017      # val images
+test: images/test2017    # test images (optional)
+
+# 80 COCO classes
+names:
+  0: person
+  1: bicycle
+  2: car
+  3: motorcycle
+  4: airplane
+  5: bus
+  6: train
+  7: truck
+  8: boat
+  9: traffic light
+  10: fire hydrant
+  11: stop sign
+  12: parking meter
+  13: bench
+  14: bird
+  15: cat
+  16: dog
+  17: horse
+  18: sheep
+  19: cow
+  20: elephant
+  21: bear
+  22: zebra
+  23: giraffe
+  24: backpack
+  25: umbrella
+  26: handbag
+  27: tie
+  28: suitcase
+  29: frisbee
+  30: skis
+  31: snowboard
+  32: sports ball
+  33: kite
+  34: baseball bat
+  35: baseball glove
+  36: skateboard
+  37: surfboard
+  38: tennis racket
+  39: bottle
+  40: wine glass
+  41: cup
+  42: fork
+  43: knife
+  44: spoon
+  45: bowl
+  46: banana
+  47: apple
+  48: sandwich
+  49: orange
+  50: broccoli
+  51: carrot
+  52: hot dog
+  53: pizza
+  54: donut
+  55: cake
+  56: chair
+  57: couch
+  58: potted plant
+  59: bed
+  60: dining table
+  61: toilet
+  62: tv
+  63: laptop
+  64: mouse
+  65: remote
+  66: keyboard
+  67: cell phone
+  68: microwave
+  69: oven
+  70: toaster
+  71: sink
+  72: refrigerator
+  73: book
+  74: clock
+  75: vase
+  76: scissors
+  77: teddy bear
+  78: hair drier
+  79: toothbrush
+```
+
+### 2.9 Preprocessing Pipeline Execution (`scripts/preprocess_coco.sh`)
+
+```bash
+#!/bin/bash
+# Complete COCO preprocessing pipeline
+
+# Step 1: Download COCO dataset
+python src/preprocessing/download.py --dataset coco --output data/coco
+
+# Step 2: Convert COCO JSON to YOLO format
+python src/preprocessing/convert.py \
+  --input data/coco/annotations/instances_train2017.json \
+  --images data/coco/images/train2017 \
+  --labels data/coco/labels/train2017
+
+# Step 3: Validate conversion
+python src/preprocessing/validate.py \
+  --images data/coco/images/train2017 \
+  --labels data/coco/labels/train2017 \
+  --report data/validation_report.json
+
+# Step 4: Generate visualizations
+python src/preprocessing/visualize.py \
+  --images data/coco/images/train2017 \
+  --labels data/coco/labels/train2017 \
+  --output data/visualizations/
+
+# Step 5: Create dataset YAML
+python -c "
+import yaml
+config = {
+    'path': '../datasets/coco',
+    'train': 'images/train2017',
+    'val': 'images/val2017',
+    'test': 'images/test2017',
+    'names': [list of 80 class names]
+}
+with open('data/coco.yaml', 'w') as f:
+    yaml.dump(config, f)
+"
+```
+
+### 2.10 Deliverables
+
+- ✅ COCO dataset downloaded and organized
+- ✅ Annotations converted from COCO JSON to YOLO txt format
+- ✅ `data/coco.yaml` configuration file
+- ✅ Validation report (`data/validation_report.json`)
+- ✅ Visualization plots (`data/visualizations/`)
+- ✅ Ready-to-train dataset structure:
+
+```
+data/coco/
+├── images/
+│   ├── train2017/  (118,287 images)
+│   ├── val2017/    (5,000 images)
+│   └── test2017/   (40,670 images)
+├── labels/
+│   ├── train2017/  (118,287 .txt files)
+│   └── val2017/    (5,000 .txt files)
+└── coco.yaml       (dataset configuration)
+```
 
 ---
 
