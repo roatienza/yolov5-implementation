@@ -380,56 +380,312 @@ with open('data/coco.yaml', 'w') as f:
 
 ---
 
-## Phase 3: Model Training
+## Phase 3: Model Creation and Training
 
-### 3.1 Environment Setup (`requirements.txt`)
-```
-torch>=1.7.0
-ultralytics>=8.0.0
-opencv-python>=4.5.0
-Pillow>=7.1.2
-numpy>=1.18.5
-pandas>=1.1.4
-matplotlib>=3.2.2
-tensorboard>=2.4.1
-albumentations>=1.0.3
-tqdm>=4.64.0
+**IMPORTANT**: All operations MUST be performed in the sandbox environment. The sandbox has the following packages pre-installed:
+
+### 3.0 Existing Sandbox Packages (No Installation Needed)
+| Package | Version | Status |
+|---------|---------|--------|
+| torch | 2.11.0 | ✅ Already installed |
+| opencv-python | 4.13.0.92 | ✅ Already installed |
+| Pillow | 12.2.0 | ✅ Already installed |
+| numpy | 2.4.4 | ✅ Already installed |
+| pandas | 3.0.2 | ✅ Already installed |
+| matplotlib | 3.10.8 | ✅ Already installed |
+| tqdm | 4.67.3 | ✅ Already installed |
+
+### 3.1 Packages to Install (If Not Present)
+```bash
+# Only install if missing in sandbox
+pip install ultralytics>=8.0.0  # YOLOv5/v8 library
+pip install tensorboard>=2.4.1  # Training visualization
+pip install albumentations>=1.0.3  # Advanced augmentations
+pip install pyyaml>=6.0  # YAML configuration
 ```
 
-### 3.2 Training Configuration (`configs/training.yaml`)
+### 3.2 YOLOv5 Model Architecture Overview
+
+YOLOv5 models are available in 5 sizes, all using the same architecture with different depths and widths:
+
+| Model | Size | Parameters | FLOPs | Architecture Details |
+|-------|------|------------|-------|---------------------|
+| **YOLOv5n** | Nano | 1.9M | 4.5G | Smallest, fastest |
+| **YOLOv5s** | Small | 7.2M | 16.5G | Best speed/accuracy tradeoff |
+| **YOLOv5m** | Medium | 21.2M | 49.0G | Balanced performance |
+| **YOLOv5l** | Large | 46.5M | 109.1G | High accuracy |
+| **YOLOv5x** | X-Large | 86.7M | 205.7G | Maximum accuracy |
+
+**Architecture Components**:
+- **Backbone**: CSPDarknet with Focus layers
+- **Neck**: PANet (Path Aggregation Network)
+- **Head**: YOLO detection head with 3 output scales
+
+### 3.3 Model Creation Script (`src/training/create_model.py`)
+
+```python
+# Create YOLOv5 model instance
+# IMPORTANT: Always operate in sandbox environment
+
+from ultralytics import YOLO
+import torch
+
+def create_yolov5_model(model_size='s', pretrained=True, device='cuda:0'):
+    """
+    Creates a YOLOv5 model instance for training.
+    
+    Args:
+        model_size: 'n', 's', 'm', 'l', or 'x' (default: 's')
+        pretrained: Load COCO pretrained weights (default: True)
+        device: Device to use ('cuda:0' for GPU, 'cpu' for CPU)
+    
+    Returns:
+        model: YOLOv5 model instance ready for training
+    
+    Example:
+        >>> model = create_yolov5_model(model_size='s', pretrained=True)
+        >>> model.info()  # Display model architecture
+    """
+    # Model name mapping
+    model_names = {
+        'n': 'yolov5n.pt',
+        's': 'yolov5s.pt',
+        'm': 'yolov5m.pt',
+        'l': 'yolov5l.pt',
+        'x': 'yolov5x.pt'
+    }
+    
+    model_name = model_names.get(model_size, 'yolov5s.pt')
+    
+    # Load pretrained model (automatically downloads if not present)
+    if pretrained:
+        model = YOLO(model_name)
+    else:
+        # Create model from scratch
+        model = YOLO(f'yolov5{model_size}.yaml')
+    
+    # Move to device
+    model.to(device)
+    
+    return model
+
+def display_model_architecture(model):
+    """
+    Display detailed model architecture information.
+    
+    Shows:
+    - Layer types and dimensions
+    - Number of parameters
+    - FLOPs
+    - Input/output shapes
+    """
+    model.info(verbose=True)
+
+def export_model_structure(model, output_path):
+    """
+    Export model structure to YAML for documentation.
+    
+    Args:
+        model: YOLOv5 model instance
+        output_path: Path to save YAML (e.g., /data/models/yolov5s_structure.yaml)
+    """
+    model.export(format='torchscript')  # Can also export to ONNX
+```
+
+### 3.4 Training Configuration (`configs/training.yaml`)
+
 ```yaml
-model: yolov5s
+# Training configuration for YOLOv5
+# IMPORTANT: All paths reference /data directory in sandbox
+
+# Model settings
+model_size: 's'  # n, s, m, l, x
+pretrained: true  # Use COCO pretrained weights
+
+# Training parameters
 epochs: 100
 batch_size: 16
 img_size: 640
-device: 0
-workers: 8
-pretrained: true
+device: 'cuda:0'  # Use GPU in sandbox
+
+# Data settings (sandbox paths)
+data: '/data/coco.yaml'  # Dataset configuration
+workers: 8  # Data loading workers
+
+# Optimization
+optimizer: 'SGD'  # SGD or Adam
+lr0: 0.01  # Initial learning rate
+lrf: 0.1  # Final learning rate (lr0 * lrf)
+momentum: 0.937
+weight_decay: 0.0005
+
+# Augmentation
+hyp: 'hyp.scratch-low.yaml'  # Hyperparameters
+augment: true  # Enable mosaic and mixup
+
+# Checkpointing
+save_period: 10  # Save checkpoint every N epochs
+patience: 50  # Early stopping patience
+
+# Output
+project: '/data/runs'  # Output directory in sandbox
+name: 'experiment_001'
+exist_ok: true  # Overwrite existing runs
 ```
 
-### 3.3 Training Script (`src/training/train.py`)
-- Load pretrained YOLOv5 weights
-- Configure data loader with augmentation
-- Train model with early stopping
-- Save checkpoints every 10 epochs
-- Log metrics to TensorBoard
-- Export best model weights
+### 3.5 Training Script (`src/training/train.py`)
 
-### 3.4 Training Execution (`scripts/train.sh`)
+```python
+# Train YOLOv5 model
+# IMPORTANT: All operations in sandbox environment
+
+from ultralytics import YOLO
+import yaml
+
+def train_yolov5(model, data_path, epochs=100, batch_size=16, img_size=640):
+    """
+    Trains a YOLOv5 model on the specified dataset.
+    
+    Args:
+        model: YOLOv5 model instance (from create_yolov5_model)
+        data_path: Path to dataset YAML (e.g., /data/coco.yaml)
+        epochs: Number of training epochs
+        batch_size: Batch size for training
+        img_size: Input image size (default: 640)
+    
+    Returns:
+        results: Training results dictionary
+    
+    Example:
+        >>> model = create_yolov5_model(model_size='s')
+        >>> results = train_yolov5(model, data_path='/data/coco.yaml', epochs=100)
+    """
+    # Train the model
+    results = model.train(
+        data=data_path,
+        epochs=epochs,
+        batch=batch_size,
+        imgsz=img_size,
+        device='0',  # Use GPU
+        workers=8,
+        project='/data/runs',  # Sandbox output directory
+        name='train',
+        exist_ok=True,
+        pretrained=True,
+        optimizer='SGD',
+        verbose=True
+    )
+    
+    return results
+
+def monitor_training(model, results):
+    """
+    Monitor training progress and log metrics.
+    
+    Tracks:
+    - Loss curves (box, obj, cls)
+    - mAP@0.5 and mAP@0.5:0.95
+    - Precision and Recall
+    - Learning rate schedule
+    """
+    # Results are automatically logged to /data/runs/train/
+    # TensorBoard logs available at /data/runs/train/results
+```
+
+### 3.6 Training Execution (`scripts/train.sh`)
+
 ```bash
-python src/training/train.py \
-  --data data/dataset.yaml \
-  --weights yolov5s.pt \
-  --epochs 100 \
-  --batch-size 16 \
-  --name experiment_001
+#!/bin/bash
+# Train YOLOv5 model
+# IMPORTANT: Run in sandbox environment
+
+# Check if ultralytics is installed, install if needed
+python -c "import ultralytics" 2>/dev/null || pip install ultralytics>=8.0.0
+
+# Create model and train
+python << EOF
+from src.training.create_model import create_yolov5_model
+from src.training.train import train_yolov5
+
+# Create YOLOv5s model with pretrained weights
+model = create_yolov5_model(model_size='s', pretrained=True)
+
+# Display model architecture
+model.info(verbose=True)
+
+# Train on COCO dataset
+results = train_yolov5(
+    model=model,
+    data_path='/data/coco.yaml',
+    epochs=100,
+    batch_size=16,
+    img_size=640
+)
+
+# Save best model
+model.save('/data/runs/train/weights/best.pt')
+EOF
 ```
 
-### 3.5 Deliverables
-- Trained model weights (`runs/detect/train/weights/best.pt`)
-- Training logs (`runs/detect/train/`)
-- TensorBoard logs
-- Training metrics CSV
+### 3.7 Model Checkpointing Strategy
+
+```python
+# Automatic checkpointing during training
+# Checkpoints saved to /data/runs/train/weights/
+
+checkpoint_schedule = {
+    'every_n_epochs': 10,  # Save every 10 epochs
+    'best_model': True,  # Save best mAP model
+    'last_model': True,  # Save last epoch model
+    'final_model': True  # Save final model after training
+}
+
+# Checkpoint files:
+# - /data/runs/train/weights/epoch_10.pt
+# - /data/runs/train/weights/epoch_20.pt
+# - ...
+# - /data/runs/train/weights/best.pt (best mAP)
+# - /data/runs/train/weights/last.pt (last epoch)
+# - /data/runs/train/weights/final.pt (after training)
+```
+
+### 3.8 Training Monitoring and Logging
+
+```python
+# Training metrics logged to /data/runs/train/
+
+# Files created:
+# - results.csv: Training metrics per epoch
+# - results.png: Loss and metric curves
+# - confusion_matrix.png: Confusion matrix
+# - precision_recall_curve.png: PR curves
+# - tensorboard logs: /data/runs/train/results/
+
+# Key metrics tracked:
+metrics = {
+    'train/box_loss': float,
+    'train/obj_loss': float,
+    'train/cls_loss': float,
+    'val/mAP_0.5': float,
+    'val/mAP_0.5:0.95': float,
+    'val/precision': float,
+    'val/recall': float,
+    'val/F1': float
+}
+```
+
+### 3.9 Deliverables
+
+- ✅ Model creation script (`src/training/create_model.py`)
+- ✅ Training script (`src/training/train.py`)
+- ✅ Training configuration (`configs/training.yaml`)
+- ✅ Training execution script (`scripts/train.sh`)
+- ✅ Trained model weights (`/data/runs/train/weights/best.pt`)
+- ✅ Training logs and TensorBoard logs (`/data/runs/train/`)
+- ✅ Training metrics CSV (`/data/runs/train/results.csv`)
+- ✅ Model architecture documentation
+
+**IMPORTANT**: All training operations MUST occur in the sandbox. Model weights and logs are saved to `/data/runs/` directory.
 
 ---
 
