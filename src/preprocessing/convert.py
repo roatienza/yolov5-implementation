@@ -201,7 +201,7 @@ if __name__ == '__main__':
     print("Converting COCO train2017")
     print("=" * 60)
     convert_coco_to_yolo(
-        coco_json_path=f'{data_root}/annotations/instances_train2017.json',
+        coco_json_path=f'{data_root}/annotations/annotations/instances_train2017.json',
         output_labels_dir=f'{data_root}/labels/train2017',
         images_dir=f'{data_root}/images/train2017'
     )
@@ -211,7 +211,7 @@ if __name__ == '__main__':
     print("Converting COCO val2017")
     print("=" * 60)
     convert_coco_to_yolo(
-        coco_json_path=f'{data_root}/annotations/instances_val2017.json',
+        coco_json_path=f'{data_root}/annotations/annotations/instances_val2017.json',
         output_labels_dir=f'{data_root}/labels/val2017',
         images_dir=f'{data_root}/images/val2017'
     )

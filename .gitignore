@@ -95,7 +95,7 @@ runs/
 *.log
 
 # Data directories
-data/
+data/*
 
 # Large files
 *.zip
@@ -106,3 +106,4 @@ data/
 # OS files
 .DS_Store
 Thumbs.db
+!data/dataset.yaml
