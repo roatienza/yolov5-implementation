@@ -10,10 +10,21 @@ import torch
 from ultralytics import YOLO
 
 
+def verify_gpu_available():
+    """Verify GPU is available before training - MUST fail if no GPU"""
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU is not available! Training requires GPU acceleration.")
+    
+    print(f"✓ GPU Available: {torch.cuda.get_device_name(0)}")
+    print(f"✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    print(f"✓ CUDA Version: {torch.version.cuda}")
+    return True
+
+
 class YOLOv5Trainer:
     """Train YOLOv5 model on COCO dataset."""
     
-    def __init__(self, model_type: str = 'yolov5s', data_yaml: str = None,
+    def __init__(self, model_type: str = 's', data_yaml: str = None,
                  epochs: int = 100, batch_size: int = 16, img_size: int = 640,
                  device: str = '0', workers: int = 8):
         """
@@ -26,6 +37,9 @@ class YOLOv5Trainer:
             device: GPU device ID(s)
             workers: Number of data loading workers
         """
+        # Verify GPU first
+        verify_gpu_available()
+        
         self.model_type = model_type
         self.data_yaml = data_yaml or '/workspace/yolov5-implementation/data/dataset.yaml'
         self.epochs = epochs
@@ -35,6 +49,7 @@ class YOLOv5Trainer:
         self.workers = workers
         
         # Initialize model
+        print(f"Loading YOLOv5{model_type} model...")
         self.model = YOLO(f'yolov5{model_type}.pt')
         
         # Training arguments - simplified for ultralytics compatibility
@@ -74,9 +89,9 @@ class YOLOv5Trainer:
             'cls': 0.5,
             'dfl': 1.5,
             'nbs': 64,
-            'project': 'runs/train',
+            'project': '/workspace/yolov5-implementation/runs/train',
             'name': f'exp_{model_type}',
-            'exist_ok': False,
+            'exist_ok': True,
             'val': True,
             'split': 'val',
             'plots': True,
@@ -92,7 +107,7 @@ class YOLOv5Trainer:
         print("=" * 60)
         print("Starting YOLOv5 Training")
         print("=" * 60)
-        print(f"Model: {self.model_type}")
+        print(f"Model: yolov5{self.model_type}")
         print(f"Data: {self.data_yaml}")
         print(f"Epochs: {self.epochs}")
         print(f"Batch size: {self.batch_size}")
@@ -127,7 +142,7 @@ class YOLOv5Trainer:
         return results
 
 
-def train_yolov5(model_type: str = 'yolov5s', epochs: int = 100,
+def train_yolov5(model_type: str = 's', epochs: int = 100,
                  batch_size: int = 16, device: str = '0') -> Dict:
     """
     Train YOLOv5 model on COCO dataset.
