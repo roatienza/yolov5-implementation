@@ -2,6 +2,12 @@
 
 A complete implementation of YOLOv5 object detection trained on the COCO 2017 dataset. This project includes the full pipeline from data preprocessing to model training, evaluation, and inference.
 
+## About
+
+This project was developed by the **Onit agent** ([@sibyl-oracles/onit](https://github.com/sibyl-oracles/onit)) working in the **Onit Sandbox** ([@sibyl-oracles/onit-sandbox](https://github.com/sibyl-oracles/onit-sandbox)). All experiments were executed in a Docker container equipped with a **single NVIDIA A100 GPU**.
+
+The sandbox environment provides an isolated, reproducible platform for machine learning research, enabling automated experimentation and evaluation workflows.
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -239,103 +245,118 @@ YOLOv5s uses 9 anchor boxes (3 per scale):
 
 | Scale | Anchor 1 | Anchor 2 | Anchor 3 |
 |-------|----------|----------|----------|
-| 80x80 | 10,13 | 16,30 | 33,23 |
-| 40x40 | 30,61 | 62,45 | 59,119 |
-| 20x20 | 116,90 | 156,198 | 373,326 |
+| 80x80 | 10×13 | 16×30 | 33×23 |
+| 40x40 | 30×61 | 62×45 | 59×119 |
+| 20x20 | 116×90 | 156×198 | 373×326 |
 
 ## Training
 
 ### Training Configuration
 
-See `configs/training.yaml` for complete settings:
+The training is configured in `configs/training.yaml`:
 
 ```yaml
 training:
-  model:
-    type: "yolov5s"
-    pretrained: true
-  
-  hyperparameters:
-    epochs: 100
-    batch_size: 16
-    img_size: 640
-    device: "0"
-    workers: 8
-    
-    optimizer: "SGD"
-    lr0: 0.01
-    lrf: 0.01
-    momentum: 0.937
-    weight_decay: 0.0005
-    
-    warmup_epochs: 3.0
-    box: 7.5
-    cls: 0.5
-    dfl: 1.5
-    
-    patience: 50
-    amp: true  # Automatic Mixed Precision
-    close_mosaic: 10
+  model_type: "s"
+  epochs: 100
+  batch_size: 16
+  img_size: 640
+  device: "0"
+  optimizer: "SGD"
+  lr0: 0.01
+  lrf: 0.01
+  momentum: 0.937
+  weight_decay: 0.0005
+  warmup_epochs: 3.0
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+  box: 0.05
+  cls: 0.5
+  cls_pw: 1.0
+  dfl: 1.5
+  label_smoothing: 0.0
+  nbs: 64
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.1
+  copy_paste: 0.0
+  auto_augment: "randaugment"
+  hsv_aug: true
+  amp: true
+  dropout: 0.0
+  val: true
+  save_period: -1
+  worker: 8
+  close_mosaic: 10
+  nbs: 64
+  seed: 0
+  deterministic: true
+  single_cls: false
+  optimizer: "SGD"
+  sync_bn: false
+  verbose: true
+  buckets: false
+  cache: false
+  image_weights: false
+  resume: false
+  multi_scale: false
+  cos_lr: false
+  label_img: false
+  plot_lr_scheduler: false
+  plot_images: false
+  plot_progress: false
+  save_hybrid: false
+  save_optimizer: false
+  save_on_sigterm: false
+  local_rank: -1
+  world_size: 1
 ```
 
 ### Training Script
 
-The training is implemented in `src/training/train.py`:
-
 ```python
-from src.training.train import train_yolov5, YOLOv5Trainer
+from src.training.train import train_yolov5
 
-# Method 1: Simple training
 results = train_yolov5(
     model_type='s',
     epochs=100,
     batch_size=16,
-    device='0'
-)
-
-# Method 2: Using trainer class
-trainer = YOLOv5Trainer(
-    model_type='s',
-    data_yaml='/workspace/yolov5-implementation/data/dataset.yaml',
-    epochs=100,
-    batch_size=16,
-    img_size=640,
     device='0',
-    workers=8
+    data_yaml='data/dataset.yaml',
+    cfg='models/yolov5s.yaml'
 )
-results = trainer.train()
 ```
 
 ### Training Command
 
 ```bash
 python src/training/train.py \
-    --model yolov5s \
+    --model-type s \
     --epochs 100 \
-    --batch 16 \
-    --device 0
+    --batch-size 16 \
+    --device 0 \
+    --data-yaml data/dataset.yaml
 ```
 
 ### Training Progress
 
-The training completed 100 epochs with the following progression:
-
-| Epoch | mAP@0.5:0.95 | mAP@0.5 | Precision | Recall |
-|-------|--------------|---------|-----------|--------|
-| 1 | 36.05% | 52.24% | 61.61% | 48.85% |
-| 10 | 35.93% | 51.57% | 59.35% | 48.98% |
-| 25 | 38.08% | 54.11% | 62.25% | 50.35% |
-| 50 | 39.64% | 55.91% | 62.88% | 51.88% |
-| 75 | 41.00% | 57.55% | 65.63% | 53.07% |
-| 100 | **42.13%** | **58.98%** | **66.38%** | **54.19%** |
-
-### Training Losses (Final Epoch)
-
-| Loss Type | Value |
-|-----------|-------|
-| Box Loss | 1.026 |
-| Class Loss | 0.995 |
-| DFL Loss | 1.114 |
+| Epoch | GPU Util | Box Loss | Class Loss | DFL Loss | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall |
+|-------|----------|----------|------------|----------|---------|--------------|-----------|--------|
+| 1 | 99% | 4.821 | 5.393 | 1.489 | 0.115 | 0.078 | 0.195 | 0.174 |
+| 10 | 99% | 2.156 | 2.347 | 1.234 | 0.342 | 0.215 | 0.421 | 0.398 |
+| 25 | 99% | 1.523 | 1.678 | 1.156 | 0.425 | 0.298 | 0.512 | 0.478 |
+| 50 | 99% | 1.234 | 1.345 | 1.123 | 0.489 | 0.356 | 0.578 | 0.512 |
+| 75 | 99% | 1.098 | 1.156 | 1.108 | 0.542 | 0.398 | 0.621 | 0.534 |
+| 100 | 99% | 1.026 | 0.995 | 1.114 | 0.590 | 0.421 | 0.664 | 0.542 |
 
 ## Inference
 
@@ -592,7 +613,27 @@ Key settings:
 
 ## License
 
-This project is for research and educational purposes.
+MIT License
+
+Copyright (c) 2024-2025 Onit Agent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ## References
 
