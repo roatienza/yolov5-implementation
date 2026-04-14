@@ -655,7 +655,7 @@ If you find this work useful, please cite:
 ```bibtex
 @misc{yolov5-implementation-2025,
   title={YOLOv5 Implementation: High-Performance Object Detection on COCO Dataset},
-  author={Onit Agent},
+  author={Rowel Atienza, Onit Agent},
   year={2025},
   howpublished={\url{https://github.com/roatienza/yolov5-implementation}},
   note={Trained on NVIDIA A100 GPU using ultralytics framework v8.4.37}
