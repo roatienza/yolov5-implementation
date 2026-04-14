@@ -14,23 +14,30 @@ import numpy as np
 class YOLOv5Detector:
     """Run inference with YOLOv5 model."""
     
-    def __init__(self, model_path: str, device: str = '0', img_size: int = 640):
+    def __init__(self, model_path: str, device: Optional[str] = None, img_size: int = 640):
         """
         Args:
             model_path: Path to trained model checkpoint (.pt file)
-            device: GPU device ID
+            device: GPU device (e.g., 'cuda', 'cuda:0', or 'cpu'). If None, auto-detects.
             img_size: Input image size
         """
         self.model_path = model_path
-        self.device = device
         self.img_size = img_size
+        
+        # Auto-detect device if not specified
+        if device is None:
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        else:
+            self.device = device
         
         # Load model
         self.model = YOLO(model_path)
-        self.model.to(device)
+        # Don't call model.to(device) - ultralytics handles device internally
         
         # Set image size
         self.model.imgsz = img_size
+        
+        print(f"Model loaded on device: {self.device}")
     
     def predict(self, source: Union[str, List[str], np.ndarray], 
                 conf: float = 0.25, iou: float = 0.45,
