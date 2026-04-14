@@ -636,8 +636,8 @@ Key settings:
 
 | File | Size | Download |
 |------|------|----------|
-| best.pt | 18.6 MB | `/uploads/best.pt` |
-| last.pt | 18.6 MB | `/uploads/last.pt` |
+| best.pt | 18.6 MB | `best.pt` |
+| last.pt | 18.6 MB | `last.pt` |
 
 ### Training Artifacts
 
